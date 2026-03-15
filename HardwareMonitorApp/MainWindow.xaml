@@ -1,0 +1,82 @@
+<Window x:Class="HardwareMonitorApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="하드웨어 모니터 프로" Height="500" Width="850"
+        Background="#121212" Foreground="White" WindowStyle="None"
+        AllowsTransparency="True" ResizeMode="CanResize"
+        WindowStartupLocation="CenterScreen">
+    
+    <Border CornerRadius="15" Background="#1E1E1E" BorderBrush="#333" BorderThickness="1">
+        <Grid Margin="25">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- 상단 헤더 -->
+            <Grid Grid.Row="0">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="🖥️ 하드웨어 실시간 모니터링" FontSize="22" FontWeight="Bold" VerticalAlignment="Center" Foreground="#E0E0E0"/>
+                    <Border Background="#4CAF50" CornerRadius="4" Margin="15,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="관리자 모드" Foreground="White" Padding="8,3" FontSize="11" FontWeight="Bold"/>
+                    </Border>
+                </StackPanel>
+                <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Center" Background="Transparent" 
+                        BorderThickness="0" Foreground="#888" Cursor="Hand" Click="Close_Click" FontSize="20"/>
+            </Grid>
+
+            <!-- 메인 카드 레이아웃 -->
+            <UniformGrid Grid.Row="1" Columns="2" Margin="0,25">
+                
+                <!-- CPU 카드 -->
+                <Border Margin="10" Padding="20" Background="#252525" CornerRadius="15">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="CPU 패키지 온도" Foreground="#AAA" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="TxtCpuTemp" Text="-- °C" FontSize="38" FontWeight="Bold" Foreground="#FF5252" Margin="0,10"/>
+                        <ProgressBar x:Name="PbCpuTemp" Value="0" Height="6" Background="#333" Foreground="#FF5252" BorderThickness="0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- GPU 카드 -->
+                <Border Margin="10" Padding="20" Background="#252525" CornerRadius="15">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="GPU 코어 온도" Foreground="#AAA" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="TxtGpuTemp" Text="-- °C" FontSize="38" FontWeight="Bold" Foreground="#2196F3" Margin="0,10"/>
+                        <ProgressBar x:Name="PbGpuTemp" Value="0" Height="6" Background="#333" Foreground="#2196F3" BorderThickness="0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 저장장치 온도 카드 -->
+                <Border Margin="10" Padding="20" Background="#252525" CornerRadius="15">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="저장장치(HDD/SSD) 온도" Foreground="#AAA" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="TxtHddTemp" Text="-- °C" FontSize="38" FontWeight="Bold" Foreground="#FFA000" Margin="0,10"/>
+                        <ProgressBar x:Name="PbHddTemp" Value="0" Height="6" Background="#333" Foreground="#FFA000" BorderThickness="0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- HDD 작동 시간 카드 -->
+                <Border Margin="10" Padding="20" Background="#252525" CornerRadius="15">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="하드디스크 총 가동 시간" Foreground="#AAA" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="TxtHddHours" Text="-- 시간" FontSize="32" FontWeight="Bold" Foreground="#4CAF50" Margin="0,10"/>
+                        <TextBlock Text="S.M.A.R.T 데이터 기반" Foreground="#555" FontSize="11"/>
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- 하단 제어 버튼 -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
+                <Button Content="📀 CD-ROM 드라이브 열기" Padding="30,15" Background="#383838" Foreground="White" 
+                        BorderThickness="0" Cursor="Hand" Click="EjectCD_Click" FontWeight="Bold" FontSize="14">
+                    <Button.Resources>
+                        <Style TargetType="Border">
+                            <Setter Property="CornerRadius" Value="10"/>
+                        </Style>
+                    </Button.Resources>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

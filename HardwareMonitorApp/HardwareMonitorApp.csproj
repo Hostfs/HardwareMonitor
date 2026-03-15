@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 하드웨어 온도 센서 접근을 위한 라이브러리 -->
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.3" />
+    <!-- HDD 작동 시간(WMI) 조회를 위한 라이브러리 -->
+    <PackageReference Include="System.Management" Version="8.0.0" />
+  </ItemGroup>
+</Project>
