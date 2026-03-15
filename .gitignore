@@ -1,0 +1,17 @@
+# Visual Studio 
+.vs/
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# .NET
+*.pdb
+*.exe
+*.dll
+*.deps.json
+*.runtimeconfig.json
+*.cache
+*.vsidx

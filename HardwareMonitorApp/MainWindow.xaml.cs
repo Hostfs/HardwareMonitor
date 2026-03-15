@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+using System.IO;
 using System.Management;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -6,28 +8,32 @@ using LibreHardwareMonitor.Hardware;
 
 namespace HardwareMonitorApp
 {
-    /// <summary>
-    /// 하드웨어 모니터링 메인 로직
-    /// </summary>
+    public class StorageInfo
+    {
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "Disk"; 
+        public float? Temperature { get; set; }
+        public string TemperatureDisplay => Temperature.HasValue ? $"{Temperature:F0} °C" : "N/A";
+        public string PowerOnHours { get; set; } = "조회 중...";
+    }
+
     public partial class MainWindow : Window
     {
-        private Computer _computer;
-        private DispatcherTimer _timer;
+        private Computer? _computer;
+        private DispatcherTimer? _timer;
+        public ObservableCollection<StorageInfo> StorageDevices { get; set; } = new ObservableCollection<StorageInfo>();
 
-        // CD-ROM 트레이 제어를 위한 Win32 API 임포트
         [DllImport("winmm.dll", EntryPoint = "mciSendStringA", CharSet = CharSet.Ansi)]
         protected static extern int mciSendString(string lpstrCommand, string lpstrReturnString, int uReturnLength, IntPtr hwndCallback);
 
         public MainWindow()
         {
             InitializeComponent();
-            SetupMonitor(); // 센서 설정
-            StartTimer();   // 갱신 타이머 시작
+            ListStorage.ItemsSource = StorageDevices;
+            SetupMonitor();
+            StartTimer();
         }
 
-        /// <summary>
-        /// 하드웨어 모니터링 객체 초기화
-        /// </summary>
         private void SetupMonitor()
         {
             try
@@ -36,129 +42,176 @@ namespace HardwareMonitorApp
                 {
                     IsCpuEnabled = true,
                     IsGpuEnabled = true,
-                    IsStorageEnabled = true
+                    IsStorageEnabled = true,
+                    IsMotherboardEnabled = true,
+                    IsControllerEnabled = true
                 };
                 _computer.Open();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"하드웨어 정보를 읽어오는데 실패했습니다. 관리자 권한으로 실행 중인지 확인해 주세요.\n\n오류 내용: {ex.Message}", "권한 또는 시스템 오류");
+                MessageBox.Show($"초기화 오류: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// 2초마다 데이터를 갱신하는 타이머 설정
-        /// </summary>
         private void StartTimer()
         {
-            _timer = new DispatcherTimer();
-            _timer.Interval = TimeSpan.FromSeconds(2);
+            _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             _timer.Tick += (s, e) => UpdateStats();
             _timer.Start();
-            UpdateStats(); // 초기 1회 즉시 실행
+            UpdateStats();
         }
 
-        /// <summary>
-        /// 실시간 하드웨어 상태 업데이트 로직
-        /// </summary>
         private void UpdateStats()
         {
             if (_computer == null) return;
 
             try
             {
+                var currentStorages = new List<StorageInfo>();
+
                 foreach (var hardware in _computer.Hardware)
                 {
                     hardware.Update();
 
-                    foreach (var sensor in hardware.Sensors)
+                    // CPU/GPU 로직 (기존과 동일)
+                    if (hardware.HardwareType == HardwareType.Cpu)
                     {
-                        if (sensor.SensorType == SensorType.Temperature)
+                        TxtCpuName.Text = hardware.Name;
+                        var temp = hardware.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature && (s.Name.Contains("Package") || s.Name.Contains("Core") || s.Name.Contains("Average"))) ?? hardware.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature);
+                        if (temp != null) { TxtCpuTemp.Text = $"{temp.Value:F0} °C"; PbCpuTemp.Value = (double)(temp.Value ?? 0); }
+                    }
+
+                    if (hardware.HardwareType == HardwareType.GpuNvidia || hardware.HardwareType == HardwareType.GpuAmd || hardware.HardwareType == HardwareType.GpuIntel)
+                    {
+                        TxtGpuName.Text = hardware.Name;
+                        var temp = hardware.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature && (s.Name.Contains("Core") || s.Name.Contains("GPU")));
+                        if (temp != null) { TxtGpuTemp.Text = $"{temp.Value:F0} °C"; PbGpuTemp.Value = (double)(temp.Value ?? 0); }
+                    }
+
+                    // 저장장치 로직 개선
+                    if (hardware.HardwareType == HardwareType.Storage)
+                    {
+                        var tempSensor = hardware.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Temperature);
+                        
+                        // 1. LibreHardwareMonitor에서 제공하는 가동 시간 센서가 있는지 확인 (NVMe 등에 유리)
+                        var hoursSensor = hardware.Sensors.FirstOrDefault(s => s.Name.ToLower().Contains("power-on hours") || s.Name.Contains("가동 시간"));
+                        string hoursText = "조회 불가";
+
+                        if (hoursSensor != null && hoursSensor.Value.HasValue)
                         {
-                            // CPU 온도 업데이트
-                            if (hardware.HardwareType == HardwareType.Cpu && (sensor.Name.Contains("Package") || sensor.Name.Contains("Core (Average)")))
-                            {
-                                TxtCpuTemp.Text = $"{sensor.Value:F0} °C";
-                                PbCpuTemp.Value = (double)(sensor.Value ?? 0);
-                            }
-                            // GPU 온도 업데이트
-                            else if (hardware.HardwareType == HardwareType.GpuNvidia || hardware.HardwareType == HardwareType.GpuAmd)
-                            {
-                                TxtGpuTemp.Text = $"{sensor.Value:F0} °C";
-                                PbGpuTemp.Value = (double)(sensor.Value ?? 0);
-                            }
-                            // 저장장치(HDD/SSD) 온도 업데이트
-                            else if (hardware.HardwareType == HardwareType.Storage)
-                            {
-                                TxtHddTemp.Text = $"{sensor.Value:F0} °C";
-                                PbHddTemp.Value = (double)(sensor.Value ?? 0);
-                            }
+                            hoursText = $"{hoursSensor.Value:N0} 시간";
+                        }
+                        else
+                        {
+                            // 2. 센서가 없다면 WMI를 통해 정밀 조회
+                            hoursText = GetPowerOnHoursDetailed(hardware.Name);
+                        }
+
+                        currentStorages.Add(new StorageInfo 
+                        { 
+                            Name = hardware.Name, 
+                            Type = GetStorageTypeDetailed(hardware.Name),
+                            Temperature = tempSensor?.Value,
+                            PowerOnHours = hoursText
+                        });
+                    }
+                }
+
+                // UI 업데이트
+                StorageDevices.Clear();
+                foreach (var s in currentStorages) StorageDevices.Add(s);
+            }
+            catch { }
+        }
+
+        private string GetStorageTypeDetailed(string modelName)
+        {
+            try
+            {
+                using var searcher = new ManagementObjectSearcher(@"\\.\root\Microsoft\Windows\Storage", "SELECT * FROM MSFT_PhysicalDisk");
+                foreach (ManagementObject drive in searcher.Get())
+                {
+                    string? friendlyName = drive["FriendlyName"]?.ToString();
+                    if (friendlyName != null && friendlyName.IndexOf(modelName, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        UInt16 mediaType = (UInt16)drive["MediaType"];
+                        if (mediaType == 4) return "SSD";
+                        if (mediaType == 3) return "HDD";
+                    }
+                }
+            }
+            catch { }
+            return "Disk";
+        }
+
+        private string GetPowerOnHoursDetailed(string modelName)
+        {
+            try
+            {
+                // Win32_DiskDrive에서 모델명으로 장치 PNP ID를 찾습니다.
+                string deviceId = "";
+                using (var driveSearcher = new ManagementObjectSearcher("SELECT PNPDeviceID, Model FROM Win32_DiskDrive"))
+                {
+                    foreach (ManagementObject drive in driveSearcher.Get())
+                    {
+                        string driveModel = drive["Model"]?.ToString() ?? "";
+                        if (driveModel.IndexOf(modelName, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            deviceId = drive["PNPDeviceID"]?.ToString() ?? "";
+                            break;
                         }
                     }
                 }
 
-                UpdateHddHours(); // HDD 가동 시간 조회
-            }
-            catch
-            {
-                // 센서 데이터 유실 시 조용히 넘어감
-            }
-        }
+                if (string.IsNullOrEmpty(deviceId)) return "N/A";
 
-        /// <summary>
-        /// WMI를 사용하여 하드디스크의 총 가동 시간을 조회합니다.
-        /// </summary>
-        private void UpdateHddHours()
-        {
-            try
-            {
-                var searcher = new ManagementObjectSearcher("root\\WMI", "SELECT * FROM MSStorageDriver_FailurePredictData");
-                foreach (ManagementObject queryObj in searcher.Get())
+                // WMI S.M.A.R.T 데이터에서 해당 장치의 인스턴스를 찾습니다.
+                using var smartSearcher = new ManagementObjectSearcher("root\\WMI", "SELECT * FROM MSStorageDriver_FailurePredictData");
+                foreach (ManagementObject queryObj in smartSearcher.Get())
                 {
-                    byte[] vendorSpecific = (byte[])queryObj["VendorSpecific"];
-                    // S.M.A.R.T Attribute ID 0x09 (Power-on Hours) 데이터를 파싱합니다.
-                    int hours = vendorSpecific[101] + (vendorSpecific[102] << 8); 
-                    TxtHddHours.Text = $"{hours:N0} 시간";
+                    string instanceName = queryObj["InstanceName"]?.ToString() ?? "";
+                    // 인스턴스 이름에 장치 ID가 포함되어 있는지 확인 (특수문자 치환 대응)
+                    if (instanceName.ToUpper().Contains(deviceId.Replace("\\", "_").ToUpper()))
+                    {
+                        byte[] vendorSpecific = (byte[])queryObj["VendorSpecific"];
+                        // S.M.A.R.T 속성 테이블 순회 (Index 2부터 12바이트씩)
+                        for (int i = 2; i <= vendorSpecific.Length - 12; i += 12)
+                        {
+                            if (vendorSpecific[i] == 0x09) // Power-On Hours Attribute ID
+                            {
+                                // 4바이트 정수 값 추출 (Little Endian)
+                                uint hours = BitConverter.ToUInt32(vendorSpecific, i + 5);
+                                return $"{hours:N0} 시간";
+                            }
+                        }
+                    }
                 }
             }
-            catch
-            {
-                TxtHddHours.Text = "조회 불가";
-            }
+            catch { }
+            return "조회 불가";
         }
 
-        /// <summary>
-        /// CD-ROM 트레이 열기 버튼 클릭 이벤트
-        /// </summary>
         private void EjectCD_Click(object sender, RoutedEventArgs e)
         {
-            try
+            if (!DriveInfo.GetDrives().Any(d => d.DriveType == DriveType.CDRom))
             {
-                mciSendString("set cdaudio door open", null, 0, IntPtr.Zero);
+                MessageBox.Show("CD-ROM 드라이브를 찾을 수 없습니다.");
+                return;
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"CD-ROM을 여는 도중 오류가 발생했습니다: {ex.Message}");
-            }
+            mciSendString("set cdaudio door open", null, 0, IntPtr.Zero);
         }
 
-        /// <summary>
-        /// 창 닫기 버튼 클릭 이벤트
-        /// </summary>
         private void Close_Click(object sender, RoutedEventArgs e)
         {
             _computer?.Close();
             Application.Current.Shutdown();
         }
 
-        /// <summary>
-        /// 창 드래그 이동을 위한 이벤트 처리
-        /// </summary>
         protected override void OnMouseLeftButtonDown(System.Windows.Input.MouseButtonEventArgs e)
         {
             base.OnMouseLeftButtonDown(e);
-            if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed)
-                this.DragMove();
+            if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) this.DragMove();
         }
     }
 }
